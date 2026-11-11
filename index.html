@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Jev Decision Maker - Score Options</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-top: 0;
+            text-align: center;
+        }
+        .options-container {
+            margin: 20px 0;
+        }
+        .option-group {
+            margin-bottom: 15px;
+        }
+        .option-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        .option-input:focus {
+            outline: none;
+            border-color: #4a90e2;
+            box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+        }
+        .option-input.highlight-high {
+            background-color: #fff3cd;
+            border-color: #ffc107;
+            box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.3);
+        }
+        .option-input.highlight-medium {
+            background-color: #d4edda;
+            border-color: #28a745;
+            box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.3);
+        }
+        .option-input.highlight-low {
+            background-color: #f8d7da;
+            border-color: #dc3545;
+            box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.3);
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        #score-btn {
+            background-color: #4a90e2;
+            color: white;
+            flex: 1;
+        }
+        #score-btn:hover {
+            background-color: #357abd;
+        }
+        #score-btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .api-key-container {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+            position: relative;
+        }
+        .api-key-container h3 {
+            margin-top: 0;
+            color: #6c757d;
+        }
+        .api-input-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .masked-input {
+            width: 200px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+            letter-spacing: 2px;
+            background-color: #f8f9fa;
+        }
+        .error-message {
+            color: #dc3545;
+            font-size: 14px;
+            margin-left: 10px;
+            display: none;
+        }
+        .error-message.show {
+            display: block;
+        }
+        .results-container {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+        }
+        .results-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #495057;
+        }
+        .score-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 12px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 4px;
+            border-left: 4px solid #4a90e2;
+        }
+        .score-value {
+            font-weight: bold;
+            color: #4a90e2;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #6c757d;
+        }
+        .loading.hide {
+            display: none;
+        }
+        .success {
+            color: #28a745;
+            font-size: 12px;
+            margin-left: 10px;
+            display: none;
+        }
+        .success.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AI Jev Decision Maker</h1>
+        
+        <div class="options-container">
+            <div class="option-group">
+                <input type="text" class="option-input" id="option1" placeholder="Option 1" maxlength="100">
+            </div>
+            <div class="option-group">
+                <input type="text" class="option-input" id="option2" placeholder="Option 2" maxlength="100">
+            </div>
+            <div class="option-group">
+                <input type="text" class="option-input" id="option3" placeholder="Option 3" maxlength="100">
+            </div>
+        </div>
+        
+        <div class="button-group">
+            <button id="score-btn">Score Options</button>
+        </div>
+        
+        <div class="loading" id="loading">Scoring options...</div>
+        
+        <div class="results-container" id="results" style="display: none;">
+            <div class="results-title">Scores:</div>
+            <div id="scores-content"></div>
+        </div>
+        
+        <div class="api-key-container">
+            <h3>API Key</h3>
+            <div class="api-input-group">
+                <input type="password" class="masked-input" id="api-key-input" placeholder="Enter Jev API Key">
+                <span class="error-message" id="api-key-error">Please enter a valid API key</span>
+                <span class="success" id="api-key-success">API key saved!</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Constants
+        const DEFAULT_N = 3;
+        const TARGET_URL = 'https://api.typesafe.ai/v1/systemone';
+        const JEV_API_URL = 'https://corsproxy.io/?' + encodeURIComponent(TARGET_URL);
+        const LOCAL_STORAGE_KEY = 'jev_api_key';
+        
+        // DOM Elements
+        const optionInputs = document.querySelectorAll('.option-input');
+        const scoreBtn = document.getElementById('score-btn');
+        const loading = document.getElementById('loading');
+        const results = document.getElementById('results');
+        const scoresContent = document.getElementById('scores-content');
+        const apiKeyInput = document.getElementById('api-key-input');
+        const apiKeyError = document.getElementById('api-key-error');
+        const apiKeySuccess = document.getElementById('api-key-success');
+        
+        // Initialize
+        function init() {
+            // Load API key from localStorage
+            const savedKey = localStorage.getItem(LOCAL_STORAGE_KEY);
+            if (savedKey) {
+                apiKeyInput.value = savedKey;
+                apiKeyInput.type = 'password'; // Keep masked
+                apiKeyInput.style.backgroundColor = '#e8f5e8';
+                apiKeyError.classList.remove('show');
+            } else {
+                showApiKeyError('API key required in localStorage');
+            }
+            
+            // Add input listeners
+            optionInputs.forEach(input => {
+                input.addEventListener('input', validateForm);
+            });
+            
+            apiKeyInput.addEventListener('blur', validateAndSaveApiKey);
+            apiKeyInput.addEventListener('change', validateAndSaveApiKey);
+            
+            scoreBtn.addEventListener('click', handleScoreClick);
+            
+            validateForm();
+        }
+        
+        // Validate form and enable/disable score button
+        function validateForm() {
+            const nonEmptyOptions = Array.from(optionInputs).filter(input => input.value.trim() !== '');
+            const hasApiKey = apiKeyInput.value.trim() !== '';
+            
+            scoreBtn.disabled = !(nonEmptyOptions.length > 0 && hasApiKey);
+        }
+        
+        // Validate and save API key
+        function validateAndSaveApiKey() {
+            const apiKey = apiKeyInput.value.trim();
+            
+            if (!apiKey) {
+                showApiKeyError('Please enter a valid API key');
+                localStorage.removeItem(LOCAL_STORAGE_KEY);
+                return;
+            }
+            
+            // Save to localStorage
+            localStorage.setItem(LOCAL_STORAGE_KEY, apiKey);
+            showApiKeySuccess();
+            validateForm();
+        }
+        
+        function showApiKeyError(message) {
+            apiKeyError.textContent = message;
+            apiKeyError.classList.add('show');
+            apiKeySuccess.classList.remove('show');
+        }
+        
+        function showApiKeySuccess() {
+            apiKeyError.classList.remove('show');
+            apiKeySuccess.classList.add('show');
+            apiKeyInput.style.backgroundColor = '#e8f5e8';
+            
+            setTimeout(() => {
+                apiKeySuccess.classList.remove('show');
+            }, 3000);
+        }
+        
+        // Handle score button click
+        async function handleScoreClick() {
+            const activeInputs = Array.from(optionInputs).filter(input => input.value.trim() !== '');
+            const options = activeInputs.map(input => input.value.trim());
+            
+            if (options.length === 0) return;
+            
+            scoreBtn.disabled = true;
+            loading.classList.remove('hide');
+            results.style.display = 'none';
+            hideHighlights();
+            
+            try {
+                const scores = await scoreOptions(options);
+                displayResults(activeInputs, scores);
+                highlightBestOptions(activeInputs, scores);
+            } catch (error) {
+                console.error('Error scoring options:', error);
+                alert('Error scoring options. Please check your API key and try again.');
+            } finally {
+                loading.classList.add('hide');
+                scoreBtn.disabled = false;
+            }
+        }
+        
+        // Score options using Jev API
+        async function scoreOptions(options) {
+            const apiKey = apiKeyInput.value.trim();
+            if (!apiKey) {
+                throw new Error('API key is required');
+            }
+            return await fetchJevApi(options, apiKey);
+        }
+        
+        // Fetch data from JEV API
+        async function fetchJevApi(options, apiKey) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000);
+            
+            // Build dynamic questions object matching the official Jev API structure
+            const questionsPayload = {};
+            options.forEach((opt, idx) => {
+                questionsPayload[`option_${idx}`] = {
+                    type: "score",
+                    instructions: `Evaluate and rate the quality or viability of this choice: ${opt}`,
+                    criteria: [
+                        "Low viability or poor choice",
+                        "Moderate choice",
+                        "Highest viability or best choice"
+                    ]
+                };
+            });
+            
+            try {
+                const response = await fetch(JEV_API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: 'jev-latest',
+                        state: "Evaluate the following user options and assign comparative scores.",
+                        questions: questionsPayload
+                    }),
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    const errorData = await response.text();
+                    throw new Error(`JEV API error: ${response.status} ${response.statusText}\n${errorData}`);
+                }
+                
+                const data = await response.json();
+                
+                // Parse answers matching the dynamic question keys
+                const scores = [];
+                const answers = data.answers || {};
+                
+                options.forEach((opt, idx) => {
+                    const key = `option_${idx}`;
+                    let scoreVal = 0;
+                    if (answers[key]) {
+                        // Jev score primitive returns a weighted .score property (float)
+                        scoreVal = answers[key].score ?? 0;
+                    }
+                    scores.push({ option: opt, score: Number(scoreVal) });
+                });
+                
+                return scores;
+                
+            } catch (error) {
+                clearTimeout(timeoutId);
+                console.error('JEV API call failed:', error);
+                throw error;
+            }
+        }
+        
+        // Display results
+        function displayResults(activeInputs, scores) {
+            scoresContent.innerHTML = '';
+            
+            scores.forEach((item, index) => {
+                const scoreItem = document.createElement('div');
+                scoreItem.className = 'score-item';
+                scoreItem.innerHTML = `
+                    <span>${index + 1}. ${item.option}</span>
+                    <span class="score-value">Score: ${item.score}</span>
+                `;
+                scoresContent.appendChild(scoreItem);
+            });
+            
+            results.style.display = 'block';
+        }
+        
+        // Highlight best options (supports multiple if leading scores are close)
+        function highlightBestOptions(activeInputs, scores) {
+            if (scores.length === 0) return;
+            
+            hideHighlights();
+            
+            // Sort scores descending to find max score
+            const sortedScores = [...scores].sort((a, b) => b.score - a.score);
+            const maxScore = sortedScores[0].score;
+            const threshold = 0.15; // Close score threshold
+            
+            scores.forEach((item, index) => {
+                const inputElement = activeInputs[index];
+                if (!inputElement) return;
+                
+                // Check if score is highest or close to the highest score
+                if (Math.abs(item.score - maxScore) <= threshold) {
+                    inputElement.classList.add('highlight-high');
+                } else {
+                    inputElement.classList.add('highlight-low');
+                }
+            });
+        }
+        
+        function hideHighlights() {
+            optionInputs.forEach(input => {
+                input.classList.remove('highlight-high', 'highlight-medium', 'highlight-low');
+                input.style.backgroundColor = '';
+                input.style.borderColor = '';
+            });
+        }
+        
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
