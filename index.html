@@ -198,7 +198,7 @@
         </div>
     </div>
 
-    <script>
+    <script type="module">
         // Constants
         const DEFAULT_N = 3;
         const TARGET_URL = 'https://api.typesafe.ai/v1/systemone';
@@ -214,7 +214,28 @@
         const apiKeyInput = document.getElementById('api-key-input');
         const apiKeyError = document.getElementById('api-key-error');
         const apiKeySuccess = document.getElementById('api-key-success');
-        
+
+        import { env, pipeline } from './vendor/transformers.min.js';
+        env.backends.onnx.wasm.wasmPaths = './vendor/';
+        env.allowRemoteModels = false;
+        env.allowLocalModels = true;
+        env.localModelPath = './models/';
+
+        // const MODEL_ID = 'onnx-community/von-ONNX';
+        const MODEL_ID = 'MoritzLaurer/xtremedistil-l6-h256-zeroshot-v1.1-all-33';
+
+        let classifierPromise = null;
+
+        function getClassifier() {
+            if (!classifierPromise) {
+                classifierPromise = pipeline('zero-shot-classification', MODEL_ID, {
+                    device: 'wasm', // Runs natively on M4 CPU via local WASM with zero WebGPU/CDN worker issues
+                    dtype: 'q8'     // Loads onnx/model_quantized.onnx (~25 MB)
+                });
+            }
+            return classifierPromise;
+        }
+
         // Initialize
         function init() {
             // Load API key from localStorage
@@ -280,105 +301,69 @@
                 apiKeySuccess.classList.remove('show');
             }, 3000);
         }
-        
+
         // Handle score button click
         async function handleScoreClick() {
             const activeInputs = Array.from(optionInputs).filter(input => input.value.trim() !== '');
             const options = activeInputs.map(input => input.value.trim());
-            
+
             if (options.length === 0) return;
-            
+
             scoreBtn.disabled = true;
             loading.classList.remove('hide');
             results.style.display = 'none';
             hideHighlights();
-            
+
             try {
                 const scores = await scoreOptions(options);
                 displayResults(activeInputs, scores);
                 highlightBestOptions(activeInputs, scores);
             } catch (error) {
                 console.error('Error scoring options:', error);
-                alert('Error scoring options. Please check your API key and try again.');
+                alert('Error running local model inference. Check the browser console for details.');
             } finally {
                 loading.classList.add('hide');
                 scoreBtn.disabled = false;
             }
         }
-        
-        // Score options using Jev API
+
+        // Score options locally in the browser using Hugging Face weights
         async function scoreOptions(options) {
-            const apiKey = apiKeyInput.value.trim();
-            if (!apiKey) {
-                throw new Error('API key is required');
-            }
-            return await fetchJevApi(options, apiKey);
-        }
-        
-        // Fetch data from JEV API
-        async function fetchJevApi(options, apiKey) {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 30000);
-            
-            // Build dynamic questions object matching the official Jev API structure
-            const questionsPayload = {};
-            options.forEach((opt, idx) => {
-                questionsPayload[`option_${idx}`] = {
-                    type: "score",
-                    instructions: `Evaluate and rate the quality or viability of this choice: ${opt}`,
-                    criteria: [
-                        "Low viability or poor choice",
-                        "Moderate choice",
-                        "Highest viability or best choice"
-                    ]
-                };
-            });
-            
-            try {
-                const response = await fetch(JEV_API_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${apiKey}`
-                    },
-                    body: JSON.stringify({
-                        model: 'jev-latest',
-                        state: "Evaluate the following user options and assign comparative scores.",
-                        questions: questionsPayload
-                    }),
-                    signal: controller.signal
+            const classifier = await getClassifier();
+
+            const criteria = [
+                'Low viability or poor choice',
+                'Moderate choice',
+                'Highest viability or best choice'
+            ];
+
+            const scores = [];
+
+            for (const opt of options) {
+                const premise = `Evaluate and rate the quality or viability of this choice: ${opt}`;
+                const output = await classifier(premise, criteria, {
+                    hypothesis_template: 'This option is best described as: {}.'
                 });
-                
-                clearTimeout(timeoutId);
-                
-                if (!response.ok) {
-                    const errorData = await response.text();
-                    throw new Error(`JEV API error: ${response.status} ${response.statusText}\n${errorData}`);
-                }
-                
-                const data = await response.json();
-                
-                // Parse answers matching the dynamic question keys
-                const scores = [];
-                const answers = data.answers || {};
-                
-                options.forEach((opt, idx) => {
-                    const key = `option_${idx}`;
-                    let scoreVal = 0;
-                    if (answers[key]) {
-                        // Jev score primitive returns a weighted .score property (float)
-                        scoreVal = answers[key].score ?? 0;
-                    }
-                    scores.push({ option: opt, score: Number(scoreVal) });
+
+                // Map returned labels back to their probabilities
+                const probMap = {};
+                output.labels.forEach((label, i) => {
+                    probMap[label] = output.scores[i];
                 });
-                
-                return scores;
-                
-            } catch (error) {
-                clearTimeout(timeoutId);
-                console.error('JEV API call failed:', error);
-                throw error;
+
+                // Compute expected value score on a 0.0 to 1.0 scale (matching Jev's weighted score)
+                const pLow = probMap[criteria[0]] ?? 0;
+                const pMod = probMap[criteria[1]] ?? 0;
+                const pHigh = probMap[criteria[2]] ?? 0;
+                const weightedScore = (pLow * 0.0) + (pMod * 0.5) + (pHigh * 1.0);
+
+                scores.push({
+                    option: opt,
+                    score: Number(weightedScore.toFixed(4))
+                });
             }
+
+            return scores;
         }
         
         // Display results
@@ -432,6 +417,8 @@
         
         // Initialize the app
         document.addEventListener('DOMContentLoaded', init);
+        // Re-attach event listener since module scripts have isolated scope
+        scoreBtn.addEventListener('click', handleScoreClick);
     </script>
 </body>
 </html>
